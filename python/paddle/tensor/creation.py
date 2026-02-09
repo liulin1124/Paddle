@@ -3575,35 +3575,27 @@ def assign(x: TensorLike, output: paddle.Tensor | None = None) -> paddle.Tensor:
 
 def clone(x: paddle.Tensor, name: str | None = None) -> paddle.Tensor:
     """
-    Returns a copy of input Tensor. It will always have a Tensor copy.
+    返回输入 Tensor 的一个副本，始终进行张量深拷贝，与 torch.clone 接口行为对齐。
+该函数可反向传播，梯度将从输出张量回传到输入张量。
 
-    In addition, This function is derivable, so gradients will flow back from the output to input.
+Parameters:
+    x (Tensor): 待复制的输入张量。
+    name (str|None, optional): 操作的名称，一般无需设置。
 
-    Parameters:
-        x (Tensor): The input Tensor.
-        name(str|None, optional): For details, please refer to :ref:`api_guide_Name`. Generally, no setting is required. Default: None.
+Returns:
+    Tensor: 从输入张量复制得到的新张量。
 
-    Returns:
-        Tensor, A Tensor copied from ``input``.
+Examples:
+    .. code-block:: pycon
 
-    Examples:
-        .. code-block:: pycon
+    >>> import paddle
+    >>> x = paddle.ones([2])
+    >>> x.stop_gradient = False
+    >>> x.retain_grads()
+    >>> clone_x = paddle.clone(x)
+    >>> clone_x.retain_grads()
+    >>> y = clone_x**3
 
-            >>> import paddle
-            >>> import numpy as np
-
-            >>> x = paddle.ones([2])
-            >>> x.stop_gradient = False
-            >>> x.retain_grads()
-            >>> clone_x = paddle.clone(x)
-            >>> clone_x.retain_grads()
-
-            >>> y = clone_x**3
-            >>> y.backward()
-            >>> print(clone_x.grad.numpy())  # type: ignore
-            [3. 3.]
-            >>> print(x.grad.numpy())  # type: ignore
-            [3. 3.]
     """
     return x.clone()
 
