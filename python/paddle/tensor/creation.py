@@ -3573,31 +3573,74 @@ def assign(x: TensorLike, output: paddle.Tensor | None = None) -> paddle.Tensor:
     return output
 
 
-def clone(x: paddle.Tensor, name: str | None = None) -> paddle.Tensor:
+def clone(input: "paddle.Tensor", name: str | None = None) -> "paddle.Tensor":
     """
-    返回输入 Tensor 的一个副本，始终进行张量深拷贝，与 torch.clone 接口行为对齐。
-该函数可反向传播，梯度将从输出张量回传到输入张量。
-
-Parameters:
-    x (Tensor): 待复制的输入张量。
-    name (str|None, optional): 操作的名称，一般无需设置。
-
-Returns:
-    Tensor: 从输入张量复制得到的新张量。
-
-Examples:
-    .. code-block:: pycon
-
-    >>> import paddle
-    >>> x = paddle.ones([2])
-    >>> x.stop_gradient = False
-    >>> x.retain_grads()
-    >>> clone_x = paddle.clone(x)
-    >>> clone_x.retain_grads()
-    >>> y = clone_x**3
-
+    Returns a copy of input Tensor. It will always have a Tensor copy.
+    
+    This function is differentiable, so gradients will flow back from the output to input.
+    
+    Parameters:
+        input (Tensor): The input Tensor to be cloned.
+        name (str|None, optional): Name for the operation. Default: None.
+    
+    Returns:
+        Tensor: A deep copy of the input tensor with the same data, shape and dtype.
+    
+    Examples:
+        .. code-block:: python
+        
+            >>> import paddle
+            >>> import numpy as np
+            
+            >>> # Basic usage
+            >>> x = paddle.to_tensor([1., 2., 3.])
+            >>> y = paddle.clone(x)
+            >>> print(y)
+            Tensor(shape=[3], dtype=float32, place=Place(cpu), stop_gradient=True,
+                   [1., 2., 3.])
+            
+            >>> # With gradient flow
+            >>> x = paddle.ones([2])
+            >>> x.stop_gradient = False
+            >>> x.retain_grads()
+            >>> clone_x = paddle.clone(x)
+            >>> clone_x.retain_grads()
+            
+            >>> y = clone_x ** 3
+            >>> y.backward()
+            >>> print(x.grad)
+            Tensor(shape=[2], dtype=float32, place=Place(cpu), stop_gradient=False,
+                   [3., 3.])
     """
-    return x.clone()
+    if name is None:
+        name = "clone_output"
+
+    if paddle.base.framework.in_dygraph_mode():
+        return paddle._C_ops.clone(input, name)
+    elif paddle.base.framework.in_legacy_dygraph():
+        return paddle._legacy_C_ops.clone(input, name)
+    else:
+        check_dtype = [
+            "float16", "float32", "float64",
+            "int8", "int16", "int32", "int64",
+            "uint8", "uint16",
+            "bool", "complex64", "complex128"
+        ]
+
+        check_variable_and_dtype(
+            input, "input", check_dtype, "clone"
+        )
+
+        helper = LayerHelper("clone", **locals())
+        out = helper.create_variable_for_type_inference(dtype=input.dtype)
+
+        helper.append_op(
+            type="clone",
+            inputs={"X": input},
+            outputs={"Out": out},
+            attrs={"use_mkldnn": False}
+        )
+        return out
 
 
 # NOTE(zhiqiu): not public
